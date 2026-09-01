@@ -1,19 +1,43 @@
 ---
-description: Set up minimal Claude Code memory + guardrails in a fresh Angular repo (instead of /init)
+description: Set up minimal Claude Code memory + guardrails in a fresh repo (instead of /init)
 ---
 
 # Task: set up minimal Claude Code memory and guardrails for this repo
 
-This is a fresh Angular workspace. `.claude/CLAUDE.md` contains the scaffolded Angular
-best-practices block; ESLint (flat config, angular-eslint) and Prettier are configured. If the
-repo deviates from that state (no `.claude/CLAUDE.md`, an already-customized `CLAUDE.md`, no
-angular-eslint), adapt: classify whatever memory files exist, and skip lint steps that have no
-tooling to land in — noting every skip in the final report. Execute end-to-end **without asking
-questions** — every decision is pre-made below.
+Execute end-to-end **without asking questions beyond Step 0** — every other decision is pre-made
+below. If the repo deviates from the state a step assumes, adapt and name every skip in the final
+report rather than aborting or asking.
 
 **Hard constraint: no git mutations of any kind** (no commit, push, merge, branch, add, stash — at
 any point, for any reason). File edits only. Suggest a branch name and commit message at the end;
 the user commits.
+
+## Step 0 — project type (mandatory first action)
+
+Detect the stack cheaply first: `angular.json` present → Angular; else a `tsconfig.json` or an
+ESLint config → TypeScript/JavaScript; else Other. Then call the **AskUserQuestion** tool (this
+renders the arrow-key picker) with exactly these options, putting the detected type **first** with
+"(Recommended)" appended to its label. Wait for the answer; it selects the pipeline.
+
+> **Question:** "What kind of project should I set up Claude Code guardrails for?"
+> (header: "Project type")
+>
+> 1. **Angular workspace** — Scaffolded `.claude/CLAUDE.md` and angular-eslint expected. Full
+     >    pipeline: classify the Angular conventions block, map to lint rules, audit & fix violations,
+     >    guardrails, policy doc.
+> 2. **TypeScript / JavaScript** — No Angular. Classify whatever memory files exist, work with the
+     >    ESLint/Prettier setup that's already installed (no new tooling), guardrails, policy doc.
+> 3. **Other stack** — Any other language/toolchain. Skip lint mapping unless the repo already has
+     >    a linter; guardrails, CI gate if CI exists, policy doc.
+
+Pipeline per answer:
+
+- **Angular workspace** → all steps below, including the Angular mapping table in Step 1.
+- **TypeScript / JavaScript** → Steps 1–3 run against whatever memory files and lint tooling
+  already exist (the Angular table does not apply; classify with the same buckets). Install no
+  new tooling.
+- **Other stack** → same as TypeScript/JavaScript, and skip Steps 2–3 entirely if the repo has no
+  linter; note that in the policy doc and the report.
 
 ## Principles — pre-decided, do not relitigate
 
@@ -22,32 +46,37 @@ the user commits.
   (arxiv.org/abs/2602.11988). Never run `/init`; never paste command listings, file inventories,
   architecture narration, or history into `CLAUDE.md`.
 - Every instruction goes to the **strongest layer that can hold it**:
-  1. mechanically enforceable → ESLint / tsconfig / CI,
+  1. mechanically enforceable → linter / compiler config / CI,
   2. harness-enforceable → `.claude/settings.json` permission rules,
   3. only what is neither derivable from the repo nor enforceable → prose in the root
-     `CLAUDE.md`. Budget ≤60 lines; a fresh repo should land well under 30 and grow only with
-     evidence (a regression traced to a missing line).
+     `CLAUDE.md`.
+- **A root `CLAUDE.md` is optional, not an artifact this command must produce.** It is created
+  only if surviving prose passes the bar in Step 5. A fresh repo usually needs none. Hard cap if
+  one is created: 60 lines; a fresh repo should land well under 30, growing only with evidence
+  (a regression traced to a missing line).
 - Prose guardrails are probabilistic — they degrade exactly in long, busy, compacted sessions.
   Permission rules are deterministic and bind in **every** permission mode: evaluation order is
   deny → ask → allow → mode default, so an `ask` rule prompts even in auto mode and beats any
   `allow` (code.claude.com/docs/en/permissions.md).
 
-## Step 1 — classify every instruction in `.claude/CLAUDE.md`
+## Step 1 — classify every instruction in the existing memory files
 
-Account for every line; nothing is silently dropped. Buckets: **A** derivable from the repo
-(drop), **B** mechanically enforceable (move to lint/tsconfig), **C** not derivable (root
-`CLAUDE.md` prose), **drop** (generic craft advice or obsolete).
+Inventory `.claude/CLAUDE.md`, a root `CLAUDE.md`, and any other agent-memory files present.
+Account for every line; nothing is silently dropped — dropped items are recorded in the policy
+doc (Step 6). Buckets: **A** derivable from the repo (drop), **B** mechanically enforceable (move
+to lint/compiler config), **C** not derivable (candidate prose — Step 5 decides), **drop**
+(generic craft advice or obsolete).
 
-Standard verdicts for the scaffolded Angular block — but **verify each rule name against the
-installed angular-eslint first** (`ls node_modules/@angular-eslint/eslint-plugin/dist/rules/` and
-the template plugin's rule keys); this table was checked against v21.1.0 and rule sets drift:
+**Angular only** — standard verdicts for the scaffolded block, but **verify each rule name against
+the installed angular-eslint first** (`ls node_modules/@angular-eslint/eslint-plugin/dist/rules/`
+and the template plugin's rule keys); this table was checked against v21.1.0 and rule sets drift:
 
 | Instruction | Disposition |
 | --- | --- |
 | strict typing, no `any` | tsconfig `strict` + `no-explicit-any` (usually already active) — verify, drop prose |
 | standalone components | `@angular-eslint/prefer-standalone` |
 | `inject()` over constructor DI | `@angular-eslint/prefer-inject` |
-| signals / `readonly` signal props | `@angular-eslint/prefer-signals` (idioms only — "signals over Subjects/RxJS state" stays prose) |
+| signals / `readonly` signal props | `@angular-eslint/prefer-signals` (idioms only — "signals over Subjects/RxJS state" is candidate prose) |
 | OnPush change detection | `@angular-eslint/prefer-on-push-component-change-detection` |
 | `host` object over `@HostBinding`/`@HostListener` | `@angular-eslint/prefer-host-metadata-property` |
 | `input()`/`output()` over decorators | `prefer-signals` + `@angular-eslint/prefer-output-emitter-ref` |
@@ -56,32 +85,32 @@ the template plugin's rule keys); this table was checked against v21.1.0 and rul
 | native control flow `@if`/`@for` | `@angular-eslint/template/prefer-control-flow` |
 | `NgOptimizedImage` for static images | `@angular-eslint/template/prefer-ngsrc` (template `<img>` only) |
 | accessibility (focusable + key events on interactive elements) | `angular.configs.templateAccessibility` preset (static checks only) |
-| no `ngClass`/`ngStyle`; reactive forms; WCAG AA runtime half; signals-first state | **no rule exists** (as of 21.x) → the prose Conventions block |
+| no `ngClass`/`ngStyle`; reactive forms; WCAG AA runtime half; signals-first state | **no rule exists** (as of 21.x) → candidate prose |
 | small/focused components, inline templates for small ones, async pipe, "don't assume globals", lazy-load feature routes | drop — generic craft or judgment calls |
 | no `mutate` on signals | drop — the API was removed in Angular 17; the rule is obsolete |
 
 ## Step 2 — audit read-only, then enable
 
-Before touching `eslint.config.js`, write a temporary flat config **outside the repo** (e.g. the
-scratchpad) that spreads the repo's config and adds all Step-1 rules as `error`; run
-`npx eslint src --config <tmp> --format json` and count violations per rule. Then fix **all**
-violations (a fresh scaffold typically has only a handful, e.g. the generated root component
-lacking OnPush) and add the rules to the repo's `eslint.config.js` as `error`. Field notes:
+Before touching the lint config, write a temporary config **outside the repo** (e.g. the
+scratchpad) that spreads the repo's config and adds all Step-1 bucket-B rules as `error`; run the
+linter with `--format json` against it and count violations per rule. Then fix **all** violations
+(a fresh scaffold typically has only a handful, e.g. the generated root component lacking OnPush)
+and add the rules to the repo's lint config as `error`. Angular field notes:
 
 - `prefer-signals` findings are usually just missing `readonly` — mechanical.
 - Spec files are linted too, including inline test `@Component`s.
 - `ngSrc` conversions need `NgOptimizedImage` in the component's `imports`, numeric `width`/
   `height` (no units) or `fill`, and a check of the CSS so the new attributes don't change layout;
   mark the LCP image `priority`.
-- Run Prettier over every file you touch.
+- Run Prettier (or the repo's formatter) over every file you touch.
 
 ## Step 3 — CI gate
 
-If a workflow already runs tests/builds, add `npm run lint` (per npm project) so a violation
-blocks the pipeline. If the repo has no CI yet, record in the policy doc (Step 6) that the lint
-rules are unenforced until a CI lint step exists — without CI, Step 2 is theater.
+If a workflow already runs tests/builds, add the lint command (per package/project) so a violation
+blocks the pipeline. If the repo has no CI yet, record in the policy doc that the lint rules are
+unenforced until a CI lint step exists — without CI, Step 2 is theater.
 
-## Step 4 — write `.claude/settings.json` (checked in, verbatim)
+## Step 4 — write `.claude/settings.json` (checked in, verbatim, all stacks)
 
 ```json
 {
@@ -130,10 +159,21 @@ file once it exists — that is by design; the user maintains it. The ask rules 
 session onward. If `.claude/settings.local.json` gains allows later, keep `gh` entries read-only
 (`view`/`list`/`diff`/`status`).
 
-## Step 5 — replace the memory files
+## Step 5 — decide whether a root `CLAUDE.md` is warranted; replace the memory files
 
-Delete `.claude/CLAUDE.md`. Write the root `CLAUDE.md` from this skeleton (target: under 30 lines
-for a fresh repo; hard cap 60):
+Delete `.claude/CLAUDE.md` if present (its content is now in lint rules or the candidate-prose
+list). Then apply this bar to **every** candidate-prose line from Step 1:
+
+> Would its absence plausibly cause a wrong implementation that lint, types, and tests would not
+> catch?
+
+- **No line passes → create no `CLAUDE.md` at all.** This is the expected outcome for a fresh
+  repo. The generic conventions (e.g. Angular's signals-first / reactive-forms / `ngClass` ban /
+  WCAG-AA lines) usually fail the bar in a fresh repo. The git-mutation prose rule **alone does
+  not justify creating the file** — `.claude/settings.json` is the enforcement; record the
+  residual prose gap (indirect git via scripts) as an accepted gap in the policy doc instead.
+- **Lines pass → create the file with only those lines**, in this skeleton (target under 30
+  lines; hard cap 60):
 
 ```markdown
 # CLAUDE.md
@@ -150,11 +190,9 @@ structure. No command listings, no framework narration.>
 - Before editing this file or creating any new agent-memory file, read
   `docs/CLAUDE-CODE-POLICY.md`.
 
-## Conventions not enforceable by lint (the enforced ones live in `eslint.config.js`)
+## Conventions not enforceable by lint
 
-- Signals-first state: services hold private writable signals, expose `.asReadonly()` + `computed()`.
-- Reactive forms over template-driven; `class`/`style` bindings, never `ngClass`/`ngStyle`.
-- WCAG AA is a hard requirement (focus, contrast, ARIA); template lint covers only the static part.
+<only the surviving lines>
 ```
 
 Sections for **Invariants** and **Traps** are added later, only when the project has earned them:
@@ -162,22 +200,28 @@ an invariant is something whose violation compiles and passes tests; a trap is a
 absence or a prod-only failure mode. A fresh repo has neither — do not pad. Likewise, when the
 project later grows a version-pinned external API surface (Shopify, Stripe, Firebase, …), add one
 Process bullet mandating research of the current official docs before writing code against that
-surface, naming the single file that records the pinned version.
+surface, naming the single file that records the pinned version. Earning an Invariants/Traps/
+Process line later is also what justifies creating the file later if none exists yet.
 
 ## Step 6 — write `docs/CLAUDE-CODE-POLICY.md`
 
-The decision record future sessions must read before touching `CLAUDE.md`. Contents: the size
-budget and its raise-triggers (evidence only); a what-lives-where table (prose / lint+CI /
-settings.json / docs / auto-memory); the prose→lint map **with the audited per-rule violation
-counts from Step 2**; the guardrail design plus its residual gaps (interpreter indirection via
-allowed `node`/`npm`, leading env assignments like `GIT_DIR=x git push`, un-enumerated plumbing,
-the human "don't ask again" click); and the traps: removing the CI lint step silently reverts
-conventions to prose, `Write(path)` rules are invalid, and any session predating
+The decision record future sessions must read **before creating or editing any `CLAUDE.md`** —
+this matters doubly when Step 5 created none: the policy doc is then the only thing standing
+between the next session and a reflexive `/init`. Contents: the CLAUDE.md-is-optional rule with
+the Step-5 bar and the size budget + raise-triggers (evidence only); a what-lives-where table
+(prose / lint+CI / settings.json / docs / auto-memory); the prose→lint map **with the audited
+per-rule violation counts from Step 2** (if lint ran); **every considered-and-dropped prose line**
+so nothing vanished silently; the guardrail design plus its residual gaps (interpreter indirection
+via allowed `node`/`npm`, leading env assignments like `GIT_DIR=x git push`, un-enumerated
+plumbing, the human "don't ask again" click — plus, when no `CLAUDE.md` exists, the accepted
+absence of the prose backstop for indirect git); and the traps: removing the CI lint step silently
+reverts conventions to prose, `Write(path)` rules are invalid, and any session predating
 `.claude/settings.json` is guarded only by prose.
 
 ## Step 7 — verify and report
 
-`npm run lint`, `npm test`, and the production build must all pass. Then report: per-rule
-violation counts found and fixed, the final `CLAUDE.md` line count, anything this repo lacked
-(no CI, missing rules in the installed angular-eslint version), and a suggested branch name +
-one-line conventional commit message. Do not commit.
+Run the repo's lint, tests, and build — whichever of these exist — and all must pass. Then
+report: the chosen project type; per-rule violation counts found and fixed (if lint ran); whether
+a root `CLAUDE.md` was created (and its line count) or why none was needed; anything this repo
+lacked (no CI, no linter, missing rules in the installed lint plugin); and a suggested branch
+name + one-line conventional commit message. Do not commit.
