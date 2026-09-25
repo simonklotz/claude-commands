@@ -16,3 +16,4 @@ frontmatter `description` is what the `/` picker shows.
 | Command | Purpose |
 | --- | --- |
 | `/init-claude` | Replacement for `/init`: sets up minimal Claude Code memory + git/gh guardrails in a fresh repo (Angular, TS/JS, or any stack via a project-type picker) |
+| `/enhance-prompt` | Sharpens a raw prompt into a precise, repo-grounded work order (goal, scope, out-of-scope, verification, explicit assumptions) to paste into a fresh session — without implementing anything |
